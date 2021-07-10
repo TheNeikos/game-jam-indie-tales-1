@@ -1,0 +1,11 @@
+{
+    "liveServer.settings.ignoreFiles": [
+        "!target/wasm.js",
+        ".vscode/**",
+        "**/*.scss",
+        "**/*.sass",
+        "**/*.ts",
+        "**"
+    ],
+    "liveServer.settings.multiRootWorkspaceName": "game-jam-indie-tales-1"
+}
