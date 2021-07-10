@@ -1,6 +1,8 @@
+use std::f32::consts::PI;
+
 use bevy::prelude::*;
 
-use crate::movement::{Movement, MovementBundle, MovementModifier, Movements, Velocity};
+use crate::movement::{Movement, MovementBundle, MovementModifier, Movements};
 
 pub struct PlayerPlugin;
 
@@ -8,6 +10,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_startup_system(spawn_player.system());
         app.add_system(handle_movement.system());
+        app.add_system(look_at_player.system());
     }
 }
 
@@ -27,7 +30,7 @@ fn spawn_player(
         .insert_bundle(MovementBundle::default())
         .insert_bundle(SpriteSheetBundle {
             texture_atlas: texture_atlas_handle,
-            transform: Transform::from_xyz(4., 3., 2.),
+            transform: Transform::from_xyz(0., 0., 1.),
             sprite: TextureAtlasSprite::new(0),
             ..Default::default()
         });
@@ -65,5 +68,26 @@ fn handle_movement(
                 },
             ));
         }
+    }
+}
+
+fn look_at_player(
+    mut mouse_input: EventReader<CursorMoved>,
+    mut player_query: Query<(&mut Transform,), With<Player>>,
+) {
+    let last_movement = if let Some(movement) = mouse_input.iter().last() {
+        movement
+    } else {
+        return;
+    };
+
+    for (mut trans,) in player_query.iter_mut() {
+        let z_value = trans.translation.z;
+        let screen_pos = ((last_movement.position - Vec2::new(0.0, 256.)).abs()
+            - Vec2::new(256., 256.))
+            * Vec2::new(1., -1.);
+        let dir = screen_pos.extend(z_value) - trans.translation;
+        let angle = f32::atan2(dir.y, dir.x) - PI / 2.0;
+        trans.rotation = Quat::from_axis_angle(Vec3::Z, angle);
     }
 }
