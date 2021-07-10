@@ -3,6 +3,8 @@ use render::add_tile_map_graph;
 
 mod map;
 mod misc;
+mod movement;
+mod player;
 mod render;
 
 fn main() {
@@ -16,11 +18,13 @@ fn main() {
     .add_plugins(DefaultPlugins)
     .add_plugin(bevy_ecs_tilemap::TilemapPlugin)
     .add_plugin(bevy_webgl2::WebGL2Plugin)
-    .add_plugin(map::MapPlugin);
+    .add_plugin(map::MapPlugin)
+    .add_plugin(player::PlayerPlugin)
+    .add_plugin(movement::MovementPlugin);
 
     app.add_system(misc::set_texture_filters_to_nearest.system());
 
-    app.add_startup_system(start_game.system());
+    app.add_startup_system(setup_game.system());
 
     let world = app.world_mut();
     add_tile_map_graph(world);
@@ -28,13 +32,6 @@ fn main() {
     app.run();
 }
 
-struct Player;
-
-fn start_game(mut commands: Commands) {
+fn setup_game(mut commands: Commands) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
-
-    commands
-        .spawn()
-        .insert(Player)
-        .insert_bundle((Transform::default(), GlobalTransform::default()));
 }
