@@ -1,11 +1,12 @@
 use std::f32::consts::PI;
 
-use bevy::prelude::*;
-use bevy_rapier2d::{physics::{ColliderBundle, RigidBodyBundle}, prelude::{ColliderShape, ColliderType, RigidBodyActivation, RigidBodyType}};
+use bevy::{math::Vec3Swizzles, prelude::*, render::camera::Camera};
+use bevy_rapier2d::{physics::{ColliderBundle, RigidBodyBundle}, prelude::{ColliderMassProps, ColliderShape, ColliderType, RigidBodyActivation, RigidBodyType}};
 
 use crate::{
     assets::GameAssets,
     movement::{Movement, MovementBundle, MovementModifier, Movements},
+    MainCamera, WINDOW_SCALE_FACTOR,
 };
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Clone, Copy, Hash, SystemLabel)]
@@ -29,6 +30,9 @@ fn spawn_player(mut commands: Commands, game_assets: Res<GameAssets>) {
         .spawn()
         .insert(Player)
         .insert_bundle(MovementBundle::default())
+        .insert(PlayerMouse {
+            position: Vec2::ZERO,
+        })
         .insert_bundle(SpriteSheetBundle {
             texture_atlas: game_assets.texture_atlas_handle.clone(),
             transform: Transform::from_xyz(0., 0., 1.),
@@ -42,13 +46,9 @@ fn spawn_player(mut commands: Commands, game_assets: Res<GameAssets>) {
         })
         .insert_bundle(ColliderBundle {
             shape: ColliderShape::ball(0.5),
-            collider_type: ColliderType::Sensor,  
+            collider_type: ColliderType::Sensor,
             ..Default::default()
         });
-    commands
-        .spawn()
-        .insert(Transform::default())
-        .insert(PlayerMouse);
 }
 
 const MAX_SPEED: f32 = 256.;
@@ -86,43 +86,41 @@ fn handle_movement(
     }
 }
 
-fn look_at_player(
-    mut transform_queries: QuerySet<(
-        Query<&Transform, With<PlayerMouse>>,
-        Query<&mut Transform, With<Player>>,
-    )>,
-) {
-    let last_movement = if let Ok(transform) = transform_queries.q0().single() {
-        transform.clone()
-    } else {
-        return;
-    };
-
-    for mut trans in transform_queries.q1_mut().iter_mut() {
-        let dir = last_movement.translation - trans.translation;
+fn look_at_player(mut transform_queries: Query<(&mut Transform, &PlayerMouse), With<Player>>) {
+    for (mut trans, player_mouse) in transform_queries.iter_mut() {
+        let dir = player_mouse.position - trans.translation.xy();
         let angle = f32::atan2(dir.y, dir.x) - PI / 2.0;
         trans.rotation = Quat::from_axis_angle(Vec3::Z, angle);
     }
 }
 
-pub struct PlayerMouse;
+pub struct PlayerMouse {
+    position: Vec2,
+}
 
 fn update_mouse_position(
     mut mouse_input: EventReader<CursorMoved>,
-    mut mouse_query: Query<(&mut Transform,), With<PlayerMouse>>,
+    mut mouse_query: Query<(&mut PlayerMouse,), With<Player>>,
+    windows: Res<Windows>,
+    camera: Query<&Transform, With<MainCamera>>,
 ) {
-    let last_movement = if let Some(movement) = mouse_input.iter().last() {
+    let last_movement = if let Some(movement) = mouse_input.iter().next_back() {
         movement
     } else {
         return;
     };
 
-    for (mut trans,) in mouse_query.iter_mut() {
-        let screen_pos = ((last_movement.position - Vec2::new(0.0, 256.)).abs()
-            - Vec2::new(256., 256.))
-            * Vec2::new(1., -1.)
-            / 2.0;
+    let window = windows.get(last_movement.id).unwrap();
+    let camera = camera.single().unwrap();
 
-        trans.translation = screen_pos.extend(0.);
+    for (mut player_mouse,) in mouse_query.iter_mut() {
+        let window_size = Vec2::new(window.width(), window.height());
+
+        let screen_pos = last_movement.position / WINDOW_SCALE_FACTOR - window_size / 2.0;
+
+        player_mouse.position =
+            (camera.compute_matrix() * screen_pos.extend(0.).extend(1.0)).into();
+
+        info!("Position: {:?}", player_mouse.position);
     }
 }

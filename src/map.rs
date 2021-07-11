@@ -35,15 +35,15 @@ fn start_game(
 
     let map_center = settings.get_pixel_center();
 
-    let (mut layer_builder, _) = LayerBuilder::new(
-        &mut commands,
-        settings,
-        0u16,
-        0u16,
-        Some(RenderPipelines::from_pipelines(vec![
-            bevy::render::pipeline::RenderPipeline::new(crate::render::SQUARE_PIPELINE.typed()),
-        ])),
-    );
+    #[cfg(target_arch = "wasm32")]
+    let pipeline = Some(RenderPipelines::from_pipelines(vec![
+        bevy::render::pipeline::RenderPipeline::new(crate::render::SQUARE_PIPELINE.typed()),
+    ]));
+
+    #[cfg(not(target_arch = "wasm32"))]
+    let pipeline = None;
+
+    let (mut layer_builder, _) = LayerBuilder::new(&mut commands, settings, 0u16, 0u16, pipeline);
 
     layer_builder.set_all(TileBundle::default());
 
