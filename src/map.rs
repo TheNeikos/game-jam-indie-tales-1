@@ -1,5 +1,9 @@
 use bevy::prelude::*;
 use bevy_ecs_tilemap::{LayerBuilder, LayerSettings, Map, MapQuery, Tile, TileBundle};
+use bevy_rapier2d::{
+    physics::{ColliderBundle, RigidBodyBundle},
+    prelude::{ColliderShape, ColliderType, RigidBodyType},
+};
 
 pub struct MapPlugin;
 
@@ -54,6 +58,8 @@ fn start_game(
         .insert(GlobalTransform::default());
 }
 
+pub struct Wall;
+
 fn setup_map(mut commands: Commands, mut map_query: MapQuery) {
     map_query.despawn_layer_tiles(&mut commands, 0u16, 0u16);
     for x in 0..16 {
@@ -68,7 +74,7 @@ fn setup_map(mut commands: Commands, mut map_query: MapQuery) {
                 0
             };
 
-            map_query
+            let entity = map_query
                 .set_tile(
                     &mut commands,
                     position,
@@ -80,6 +86,13 @@ fn setup_map(mut commands: Commands, mut map_query: MapQuery) {
                     0u16,
                 )
                 .unwrap();
+
+            if x == 0 || x == 15 || y == 0 || y == 15 {
+                commands.entity(entity).insert(Wall);
+            } else if x == 5 && y == 4 {
+            } else {
+            };
+
             map_query.notify_chunk_for_tile(position, 0u16, 0u16);
         }
     }

@@ -1,6 +1,7 @@
 use std::f32::consts::PI;
 
 use bevy::prelude::*;
+use bevy_rapier2d::{physics::{ColliderBundle, RigidBodyBundle}, prelude::{ColliderShape, ColliderType, RigidBodyActivation, RigidBodyType}};
 
 use crate::{
     assets::GameAssets,
@@ -32,6 +33,16 @@ fn spawn_player(mut commands: Commands, game_assets: Res<GameAssets>) {
             texture_atlas: game_assets.texture_atlas_handle.clone(),
             transform: Transform::from_xyz(0., 0., 1.),
             sprite: TextureAtlasSprite::new(0),
+            ..Default::default()
+        })
+        .insert_bundle(RigidBodyBundle {
+            activation: RigidBodyActivation::cannot_sleep(),
+            body_type: RigidBodyType::KinematicPositionBased,
+            ..Default::default()
+        })
+        .insert_bundle(ColliderBundle {
+            shape: ColliderShape::ball(0.5),
+            collider_type: ColliderType::Sensor,  
             ..Default::default()
         });
     commands
