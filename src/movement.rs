@@ -32,14 +32,21 @@ impl Plugin for MovementPlugin {
                 .label(MovementCalculation::Velocity)
                 .after(MovementCalculation::Movements),
         );
+        app.add_system_to_stage(
+            MovementStage,
+            set_position_from_transform
+                .system()
+                .label(MovementCalculation::Position)
+                .before(MovementCalculation::Movements),
+        );
     }
 }
 
 #[derive(Bundle, Default)]
 pub struct MovementBundle {
-    position: Position,
-    velocity: Velocity,
-    movements: Movements,
+    pub position: Position,
+    pub velocity: Velocity,
+    pub movements: Movements,
 }
 
 #[derive(Default, Debug)]
@@ -65,10 +72,18 @@ pub fn incorporate_velocity(
     }
 }
 
+pub fn set_position_from_transform(
+    mut pos_query: Query<(&mut Position, &Transform), Added<Transform>>,
+) {
+    for (mut position, transform) in pos_query.iter_mut() {
+        position.translation = transform.translation;
+    }
+}
+
 #[derive(PartialEq, Debug, Clone)]
 pub enum MovementModifier {
     /// An impulse is directly added to the velocity, bypassing the acceleration
-    Impulse { acceleration: Vec3 },
+    Impulse { impulse: Vec3 },
     /// Momentum is acceleration, up to the specified cap in velocity
     Momentum {
         acceleration: Vec3,
@@ -82,7 +97,9 @@ impl Eq for MovementModifier {}
 impl std::hash::Hash for MovementModifier {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {
-            MovementModifier::Impulse { acceleration } => {
+            MovementModifier::Impulse {
+                impulse: acceleration,
+            } => {
                 OrderedFloat(acceleration.x).hash(state);
                 OrderedFloat(acceleration.y).hash(state);
                 OrderedFloat(acceleration.z).hash(state);
@@ -106,7 +123,7 @@ impl std::hash::Hash for MovementModifier {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct MovementEffect {
     velocity: Vec3,
     acceleration: Vec3,
@@ -151,13 +168,16 @@ impl Movements {
     fn process_new_movements(&mut self) {
         for movement in self.movements.drain() {
             match movement.modifier {
-                MovementModifier::Impulse { acceleration } => {
+                MovementModifier::Impulse { impulse: velocity } => {
                     self.current_effects.insert(
                         movement.name,
                         MovementEffect {
-                            acceleration,
-                            dampening: 0.00001,
+                            acceleration: Vec3::ZERO,
+                            dampening: 0.05,
                             updated: true,
+                            maximal_velocity: f32::MAX,
+                            maximal_acceleration: f32::MAX,
+                            velocity,
                             ..Default::default()
                         },
                     );
@@ -188,7 +208,7 @@ impl Movements {
                 effect.acceleration *= effect.dampening.powf(delta_time);
             }
 
-            effect.velocity = effect.velocity.length() * effect.acceleration.normalize().lerp(effect.velocity.normalize(), 0.75).normalize();
+            // effect.velocity = effect.velocity.length() * effect.acceleration.normalize().lerp(effect.velocity.normalize(), 0.75).normalize();
 
             effect.velocity = effect.velocity.clamp_length(0., effect.maximal_velocity);
 

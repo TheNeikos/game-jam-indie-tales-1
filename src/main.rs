@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 use render::add_tile_map_graph;
 
+mod assets;
+mod bullets;
 mod map;
 mod misc;
 mod movement;
@@ -20,9 +22,11 @@ fn main() {
     .add_plugin(bevy_webgl2::WebGL2Plugin)
     .add_plugin(map::MapPlugin)
     .add_plugin(player::PlayerPlugin)
-    .add_plugin(movement::MovementPlugin);
+    .add_plugin(movement::MovementPlugin)
+    .add_plugin(assets::AssetsPlugin)
+    .add_plugin(bullets::BulletsPlugin);
 
-    app.add_system(misc::set_texture_filters_to_nearest.system());
+    // app.add_system(misc::set_texture_filters_to_nearest.system());
 
     app.add_startup_system(setup_game.system());
 

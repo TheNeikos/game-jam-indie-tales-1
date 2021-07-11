@@ -2,7 +2,13 @@ use std::f32::consts::PI;
 
 use bevy::prelude::*;
 
-use crate::movement::{Movement, MovementBundle, MovementModifier, Movements};
+use crate::{
+    assets::GameAssets,
+    movement::{Movement, MovementBundle, MovementModifier, Movements},
+};
+
+#[derive(Debug, Eq, PartialEq, PartialOrd, Clone, Copy, Hash, SystemLabel)]
+struct MouseMovementUpdate;
 
 pub struct PlayerPlugin;
 
@@ -10,30 +16,28 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_startup_system(spawn_player.system());
         app.add_system(handle_movement.system());
-        app.add_system(look_at_player.system());
+        app.add_system(update_mouse_position.system().label(MouseMovementUpdate));
+        app.add_system(look_at_player.system().after(MouseMovementUpdate));
     }
 }
 
 pub struct Player;
 
-fn spawn_player(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
-) {
-    let texture_handle = asset_server.load("entities.png");
-    let texture_atlas = TextureAtlas::from_grid(texture_handle, Vec2::new(16., 16.), 16, 16);
-    let texture_atlas_handle = texture_atlases.add(texture_atlas);
+fn spawn_player(mut commands: Commands, game_assets: Res<GameAssets>) {
     commands
         .spawn()
         .insert(Player)
         .insert_bundle(MovementBundle::default())
         .insert_bundle(SpriteSheetBundle {
-            texture_atlas: texture_atlas_handle,
+            texture_atlas: game_assets.texture_atlas_handle.clone(),
             transform: Transform::from_xyz(0., 0., 1.),
             sprite: TextureAtlasSprite::new(0),
             ..Default::default()
         });
+    commands
+        .spawn()
+        .insert(Transform::default())
+        .insert(PlayerMouse);
 }
 
 const MAX_SPEED: f32 = 256.;
@@ -72,8 +76,29 @@ fn handle_movement(
 }
 
 fn look_at_player(
+    mut transform_queries: QuerySet<(
+        Query<&Transform, With<PlayerMouse>>,
+        Query<&mut Transform, With<Player>>,
+    )>,
+) {
+    let last_movement = if let Ok(transform) = transform_queries.q0().single() {
+        transform.clone()
+    } else {
+        return;
+    };
+
+    for mut trans in transform_queries.q1_mut().iter_mut() {
+        let dir = last_movement.translation - trans.translation;
+        let angle = f32::atan2(dir.y, dir.x) - PI / 2.0;
+        trans.rotation = Quat::from_axis_angle(Vec3::Z, angle);
+    }
+}
+
+pub struct PlayerMouse;
+
+fn update_mouse_position(
     mut mouse_input: EventReader<CursorMoved>,
-    mut player_query: Query<(&mut Transform,), With<Player>>,
+    mut mouse_query: Query<(&mut Transform,), With<PlayerMouse>>,
 ) {
     let last_movement = if let Some(movement) = mouse_input.iter().last() {
         movement
@@ -81,13 +106,12 @@ fn look_at_player(
         return;
     };
 
-    for (mut trans,) in player_query.iter_mut() {
-        let z_value = trans.translation.z;
+    for (mut trans,) in mouse_query.iter_mut() {
         let screen_pos = ((last_movement.position - Vec2::new(0.0, 256.)).abs()
             - Vec2::new(256., 256.))
-            * Vec2::new(1., -1.);
-        let dir = screen_pos.extend(z_value) - trans.translation;
-        let angle = f32::atan2(dir.y, dir.x) - PI / 2.0;
-        trans.rotation = Quat::from_axis_angle(Vec3::Z, angle);
+            * Vec2::new(1., -1.)
+            / 2.0;
+
+        trans.translation = screen_pos.extend(0.);
     }
 }
